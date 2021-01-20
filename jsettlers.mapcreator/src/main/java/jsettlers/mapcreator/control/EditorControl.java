@@ -136,6 +136,7 @@ public class EditorControl extends EditorControlBase implements IMapInterfaceLis
 	 * Open GL Contents (Drawing)
 	 */
 	private MapContent mapContent;
+	private AreaContainer displayPanel;
 
 	/**
 	 * Sidebar with the tools
@@ -281,8 +282,8 @@ public class EditorControl extends EditorControlBase implements IMapInterfaceLis
 		// map display
 		Area area = new Area();
 		final Region region = new Region(Region.POSITION_CENTER);
-		area.add(region);
-		AreaContainer displayPanel = new AreaContainer(area);
+		area.set(region);
+		displayPanel = new AreaContainer(area, SettingsManager.getInstance().getBackend(), SettingsManager.getInstance().isGraphicsDebug());
 		displayPanel.setMinimumSize(new Dimension(640, 480));
 		displayPanel.setFocusable(true);
 		root.add(displayPanel, BorderLayout.CENTER);
@@ -333,6 +334,8 @@ public class EditorControl extends EditorControlBase implements IMapInterfaceLis
 	 * Quit this editor instance
 	 */
 	private void quit() {
+		displayPanel.disposeAll();
+		displayPanel = null;
 		redrawTimer.cancel();
 		validator.dispose();
 		window.dispose();
@@ -764,7 +767,7 @@ public class EditorControl extends EditorControlBase implements IMapInterfaceLis
 				// only getter call, no Swing calls
 				ShapeType shape = toolSidebar.getActiveShape();
 
-				tool.start(mapData, shape, lineAction.getPos());
+				tool.start(mapData, shape, lineAction.getPosition());
 
 				validator.reValidate();
 			}

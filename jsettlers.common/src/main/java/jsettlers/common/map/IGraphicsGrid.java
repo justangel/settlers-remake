@@ -113,6 +113,10 @@ public interface IGraphicsGrid {
 	 * @param y
 	 *            y coordinate
 	 * @return visibility value defined by the fog of war algorithm
+	 *
+	 * @implNote if your instance does not implement jsettlers.common.map.IVisibilityStateProvider.IDGPProvider
+	 * graphics will consider this function to always return CommonConstants.FOG_OF_WAR_VISIBLE.
+	 *
 	 */
 	byte getVisibleStatus(int x, int y);
 
@@ -125,17 +129,6 @@ public interface IGraphicsGrid {
 	 *            listener to be set.
 	 */
 	void setBackgroundListener(IGraphicsBackgroundListener backgroundListener);
-
-	/**
-	 * Gets the next x coordinate that might contain a drawable Object.
-	 * 
-	 * @param x
-	 * @param y
-	 * @param maxX
-	 *            the maximum x that needs to be searched.
-	 * @return a value bigger than x, might be outside the map.
-	 */
-	int nextDrawableX(int x, int y, int maxX);
 
 	/**
 	 * Gets the current data and settings of the partition at the given position.

@@ -14,7 +14,11 @@
  *******************************************************************************/
 package jsettlers.graphics.debug;
 
+import go.graphics.EGeometryFormatType;
+import go.graphics.EGeometryType;
 import go.graphics.GLDrawContext;
+import go.graphics.GeometryHandle;
+import go.graphics.IllegalBufferException;
 import go.graphics.area.Area;
 import go.graphics.event.GOEvent;
 import go.graphics.event.GOKeyEvent;
@@ -24,20 +28,21 @@ import go.graphics.swing.AreaContainer;
 import go.graphics.text.EFontSize;
 import go.graphics.text.TextDrawer;
 import jsettlers.common.Color;
+import jsettlers.common.resources.ResourceManager;
 import jsettlers.common.resources.SettlersFolderChecker;
 import jsettlers.common.utils.FileUtils;
-import jsettlers.common.utils.OptionableProperties;
 import jsettlers.common.utils.mutables.Mutable;
-import jsettlers.graphics.image.GuiImage;
-import jsettlers.graphics.image.Image;
-import jsettlers.graphics.image.LandscapeImage;
-import jsettlers.graphics.image.SettlerImage;
 import jsettlers.graphics.image.SingleImage;
-import jsettlers.graphics.reader.AdvancedDatFileReader;
-import jsettlers.graphics.reader.DatFileType;
-import jsettlers.graphics.reader.SequenceList;
-import jsettlers.graphics.sequence.Sequence;
-import jsettlers.main.swing.resources.ConfigurationPropertiesFile;
+import jsettlers.graphics.image.Image;
+import jsettlers.graphics.image.SingleImage;
+import jsettlers.graphics.image.SettlerImage;
+import jsettlers.graphics.image.reader.AdvancedDatFileReader;
+import jsettlers.graphics.image.reader.DatFileReader;
+import jsettlers.graphics.image.reader.DatFileType;
+import jsettlers.graphics.image.sequence.SequenceList;
+import jsettlers.graphics.image.sequence.Sequence;
+import jsettlers.main.swing.resources.SwingResourceProvider;
+import jsettlers.main.swing.settings.SettingsManager;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
@@ -47,10 +52,12 @@ import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Locale;
 
 public class DatFileTester {
-	private static final int DAT_FILE_INDEX = 0;
+	private static final int DAT_FILE_INDEX = 13;
 	private static final DatFileType TYPE = DatFileType.RGB565;
 
 	private static final String FILE_NAME_PATTERN = "siedler3_%02d" + TYPE.getFileSuffix();
@@ -58,14 +65,16 @@ public class DatFileTester {
 
 	private static final Color[] colors = new Color[] { Color.WHITE };
 
-	private final AdvancedDatFileReader reader;
+	private final DatFileReader reader;
 	private final Region region;
 
 	private DatFileTester() throws IOException {
+		ResourceManager.setProvider(new SwingResourceProvider());
+
 		File settlersGfxFolder = getSettlersGfxFolder();
 
 		File file = findFileIgnoringCase(settlersGfxFolder, FILE_NAME);
-		reader = new AdvancedDatFileReader(file, TYPE);
+		reader = new AdvancedDatFileReader(file, TYPE, null);
 
 		region = new Region(Region.POSITION_CENTER);
 		region.setContent(new Content());
@@ -79,7 +88,7 @@ public class DatFileTester {
 		DatFileTester datFileTester = new DatFileTester();
 
 		Area area = new Area();
-		area.add(datFileTester.region);
+		area.set(datFileTester.region);
 		AreaContainer glCanvas = new AreaContainer(area);
 
 		JFrame frame = new JFrame("Opengl image test: " + DAT_FILE_INDEX);
@@ -93,7 +102,7 @@ public class DatFileTester {
 
 		private static final int SETTLERS = 1;
 		private static final int GUI = 2;
-		private static final int LANDSCAPE = 2;
+		private static final int LANDSCAPE = 3;
 		private int offsetY = 400;
 		private int offsetX = 200;
 		private int mode = SETTLERS;
@@ -129,8 +138,8 @@ public class DatFileTester {
 						e.printStackTrace();
 					}
 				}
-				region.requestRedraw();
 			}
+			region.requestRedraw();
 		}
 
 		@Override
@@ -139,17 +148,16 @@ public class DatFileTester {
 				SequenceList<Image> sequences = reader.getSettlers();
 				drawSequences(gl2, width, height, sequences);
 			} else if (mode == GUI) {
-				Sequence<GuiImage> sequences = reader.getGuis();
+				Sequence<SingleImage> sequences = reader.getGuis();
 				drawSequence(gl2, width, height, 0, sequences);
 			} else {
-				Sequence<LandscapeImage> sequences = reader.getLandscapes();
+				Sequence<SingleImage> sequences = reader.getLandscapes();
 				drawSequence(gl2, width, height, 0, sequences);
 			}
 
 		}
 
 		private <T extends Image> void drawSequences(GLDrawContext gl2, int width, int height, SequenceList<T> sequences) {
-			gl2.glTranslatef(offsetX, offsetY, 0);
 
 			int y = 0;
 			int seqIndex = 0;
@@ -160,8 +168,8 @@ public class DatFileTester {
 
 				maxheight = drawSequence(gl2, width, height, y, seq);
 
-				gl2.color(0, 0, 0, 1);
-				drawer.drawString(20, y + 20, seqIndex + ":");
+				drawer.setColor(Color.WHITE);
+				drawer.drawString(offsetX+20, offsetY+y+20, seqIndex + ":");
 
 				seqIndex++;
 				y -= maxheight + 40;
@@ -172,31 +180,33 @@ public class DatFileTester {
 			int maxheight = 0;
 			int x = 0;
 			for (int index = 0; index < seq.length(); index++) {
-				T image = seq.getImage(index);
+				T image = seq.getImage(index, null);
 				maxheight = Math.max(maxheight, image.getHeight());
 
 				if (x > -offsetX - 100 && x < -offsetX + width + 100 && y > -offsetY - 100 && y < -offsetY + height + 100) {
-					drawImage(gl2, y, index, x, (SingleImage) image);
+					drawImage(gl2, y+offsetY, index, x+offsetX, (SingleImage) image);
 				}
 				x += 100;
 			}
 			return maxheight;
 		}
 
+		private GeometryHandle lineGeometry = null;
+		private ByteBuffer lineBfr = ByteBuffer.allocateDirect(3*4).order(ByteOrder.nativeOrder());
+
 		private void drawImage(GLDrawContext gl2, int y, int index, int x, SingleImage image) {
-			image.drawAt(gl2, x - image.getOffsetX(), y + image.getHeight() + image.getOffsetY(), colors[index % colors.length]);
+			image.drawAt(gl2, x - image.getOffsetX(), y + image.getHeight() + image.getOffsetY(), 0, colors[index % colors.length], 1);
 
-			gl2.color(1, 0, 0, 1);
-			float[] line = new float[] { x, y, 0, x, y + image.getHeight() + image.getOffsetY(), 0, x - image.getOffsetX(),
-					y + image.getHeight() + image.getOffsetY(), 0 };
-			gl2.drawLine(line, false);
-			drawPoint(gl2, x, y);
-			drawPoint(gl2, x + image.getWidth(), y);
-			drawPoint(gl2, x + image.getWidth(), y + image.getHeight());
-			drawPoint(gl2, x, y + image.getHeight());
-		}
+			if(lineGeometry == null) lineGeometry = gl2.generateGeometry(3, EGeometryFormatType.VertexOnly2D, true, null);
 
-		private void drawPoint(GLDrawContext gl2, int x, int y) {
+			try {
+				lineBfr.asFloatBuffer().put(new float[] {image.getHeight() + image.getOffsetY(), - image.getOffsetX(), image.getHeight() + image.getOffsetY() }, 0, 3);
+				gl2.updateGeometryAt(lineGeometry, 3*4, lineBfr);
+
+				gl2.draw2D(lineGeometry, null, EGeometryType.LineStrip, 0, 3, x, y, 0, 1, 1, 1, Color.RED, 1);
+			} catch (IllegalBufferException e) {
+				e.printStackTrace();
+			}
 		}
 
 		private void printHelp() {
@@ -229,20 +239,20 @@ public class DatFileTester {
 				File file = findFileIgnoringCase(settlersGfxFolder, fileName);
 
 				if (file != null && file.exists()) {
-					AdvancedDatFileReader reader = new AdvancedDatFileReader(file, TYPE);
+					DatFileReader reader = new AdvancedDatFileReader(file, TYPE, null);
 					exportTo(new File(dir, "" + i), reader);
 				}
 			}
 		}
 	}
 
-	private static void exportTo(File dir, AdvancedDatFileReader reader) {
+	private static void exportTo(File dir, DatFileReader reader) {
 		export(reader.getSettlers(), new File(dir, "settlers"));
-		Sequence<GuiImage> guis = reader.getGuis();
+		Sequence<SingleImage> guis = reader.getGuis();
 		if (guis.length() > 0) {
 			exportSequence(new File(dir, "gui"), 0, guis);
 		}
-		Sequence<LandscapeImage> landscapes = reader.getLandscapes();
+		Sequence<SingleImage> landscapes = reader.getLandscapes();
 		if (landscapes.length() > 0) {
 			exportSequence(new File(dir, "landscape"), 1, landscapes);
 		}
@@ -259,7 +269,7 @@ public class DatFileTester {
 		File seqdir = new File(dir, index + "");
 		seqdir.mkdirs();
 		for (int j = 0; j < seq.length(); j++) {
-			T image = seq.getImage(j);
+			T image = seq.getImage(j, null);
 			export((SingleImage) image, new File(seqdir, j + ".png"));
 			if (image instanceof SettlerImage && ((SettlerImage) image).getTorso() != null) {
 				export((SingleImage) ((SettlerImage) image).getTorso(), new File(seqdir, j + "_torso.png"));
@@ -282,8 +292,7 @@ public class DatFileTester {
 	}
 
 	private static File getSettlersGfxFolder() throws IOException {
-		String settlersFolderPath = new ConfigurationPropertiesFile(new OptionableProperties()).getSettlersFolderValue();
-		SettlersFolderChecker.SettlersFolderInfo settlersFolderInfo = SettlersFolderChecker.checkSettlersFolder(settlersFolderPath);
+		SettlersFolderChecker.SettlersFolderInfo settlersFolderInfo = SettlersFolderChecker.checkSettlersFolder(SettingsManager.getInstance().getSettlersFolder());
 		return settlersFolderInfo.gfxFolder;
 	}
 

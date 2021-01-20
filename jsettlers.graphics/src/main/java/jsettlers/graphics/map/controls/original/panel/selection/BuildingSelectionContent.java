@@ -18,7 +18,6 @@ import java.util.List;
 
 import go.graphics.GLDrawContext;
 import go.graphics.text.EFontSize;
-
 import jsettlers.common.buildings.EBuildingType;
 import jsettlers.common.buildings.IBuilding;
 import jsettlers.common.images.EImageLinkType;
@@ -50,6 +49,7 @@ import jsettlers.graphics.ui.Label;
 import jsettlers.graphics.ui.UIElement;
 import jsettlers.graphics.ui.UIPanel;
 import jsettlers.graphics.ui.layout.BuildingSelectionLayout;
+import jsettlers.graphics.ui.layout.DockyardSelectionLayout;
 import jsettlers.graphics.ui.layout.OccupiableSelectionLayout;
 import jsettlers.graphics.ui.layout.StockSelectionLayout;
 import jsettlers.graphics.ui.layout.TradingSelectionLayout;
@@ -308,15 +308,21 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 	private void addPanelContent(BuildingState state) {
 		rootPanel.removeAll();
 		BuildingBackgroundPanel root;
-		if (state.isOccupied()) {
+
+		if (state.isConstruction()) {
+			root = createNormalBuildingContent(state);
+		} else if (state.isOccupied()) {
 			root = createOccupiedBuildingContent(state);
 		} else if (state.isStock()) {
 			root = createStockBuildingContent(state);
 		} else if (state.isTrading()) {
 			root = createTradingBuildingContent(state);
+		} else if (state.isDockyard()) {
+			root = createDockyardBuildingContent(state);
 		} else {
 			root = createNormalBuildingContent(state);
 		}
+
 		ImageLink[] images = building.getBuildingType().getImages();
 		root.setImages(images);
 		rootPanel.addChild(root, 0, 0, 1, 1);
@@ -325,21 +331,16 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 	private BuildingBackgroundPanel createNormalBuildingContent(BuildingState state) {
 		BuildingSelectionLayout layout = new BuildingSelectionLayout();
 
-		EPriority[] supported = state.getSupportedPriorities();
-		if (supported.length < 2) {
-			layout.background.removeChild(layout.priority);
-		} else {
-			layout.priority.setPriority(supported, building.getPriority());
-		}
+		loadPriorityButton(layout.background, layout.priority, state);
 
 		if (building.getBuildingType().getWorkRadius() <= 0) {
-			layout.background.removeChild(layout.workRadius);
+			layout.background.removeChild(layout.buttonWorkRadius);
 		}
 
 		layout.nameText.setType(building.getBuildingType(), state.isConstruction());
 
 		String text = "";
-		if (building.getStateProgress() < 1) {
+		if (state.isConstruction()) {
 			text = Labels.getString("materials_required");
 		} else if (building instanceof IBuilding.IResourceBuilding) {
 			IBuilding.IResourceBuilding resourceBuilding = (IBuilding.IResourceBuilding) building;
@@ -349,8 +350,16 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 
 		addRequestAndOfferStacks(layout.materialArea, state);
 
-		BuildingBackgroundPanel root = layout._root;
-		return root;
+		return layout._root;
+	}
+
+	private void loadPriorityButton(BuildingBackgroundPanel background, PriorityButton priority, BuildingState state) {
+		EPriority[] supported = state.getSupportedPriorities();
+		if (supported.length < 2) {
+			background.removeChild(priority);
+		} else {
+			priority.setPriority(supported, building.getPriority());
+		}
 	}
 
 	private void addRequestAndOfferStacks(UIPanel materialArea, BuildingState state) {
@@ -562,8 +571,8 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 			i.setState(state);
 		}
 
-		layout.stock_accept.configure(selectionManager::getSelected, building::getPos, true, true);
-		layout.stock_reject.configure(selectionManager::getSelected, building::getPos, false, true);
+		layout.stock_accept.configure(selectionManager::getSelected, building::getPosition, true, true);
+		layout.stock_reject.configure(selectionManager::getSelected, building::getPosition, false, true);
 
 		return layout._root;
 	}
@@ -603,6 +612,18 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 		return layout._root;
 	}
 
+	private BuildingBackgroundPanel createDockyardBuildingContent(BuildingState state) {
+		DockyardSelectionLayout layout = new DockyardSelectionLayout();
+		loadPriorityButton(layout.background, layout.priority, state);
+		layout.nameText.setType(building.getBuildingType(), state.isConstruction());
+
+		if (state.isWorkingDockyard()) {
+			layout.materialText.setText(Labels.getString("materials_required"));
+			addRequestAndOfferStacks(layout.materialArea, state);
+		}
+		return layout._root;
+	}
+
 	/**
 	 * This is the panel displayed in the background during building selection.
 	 *
@@ -632,7 +653,7 @@ public class BuildingSelectionContent extends AbstractSelectionContent {
 			float cy = getPosition().getCenterY();
 
 			for (ImageLink link : links) {
-				ImageProvider.getInstance().getImage(link).drawAt(gl, cx, cy);
+				ImageProvider.getInstance().getImage(link).drawAt(gl, cx, cy, 0, null, 1);
 			}
 		}
 

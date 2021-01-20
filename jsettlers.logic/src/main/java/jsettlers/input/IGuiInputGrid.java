@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 - 2017
+ * Copyright (c) 2015 - 2018
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -22,6 +22,7 @@ import jsettlers.common.buildings.IBuilding;
 import jsettlers.common.material.EMaterialType;
 import jsettlers.common.menu.UIState;
 import jsettlers.common.position.ShortPoint2D;
+import jsettlers.logic.FerryEntrance;
 import jsettlers.logic.map.grid.partition.manager.settings.MaterialProductionSettings;
 import jsettlers.logic.player.Player;
 
@@ -132,4 +133,10 @@ public interface IGuiInputGrid {
 	MaterialProductionSettings getMaterialProductionAt(ShortPoint2D position);
 
 	void setAcceptedStockMaterial(ShortPoint2D position, EMaterialType materialType, boolean accepted);
+
+	FerryEntrance ferryAtPosition(ShortPoint2D position, byte playerId);
+
+	boolean isNavigable(int x, int y);
+
+	boolean hasLost(byte playerId);
 }

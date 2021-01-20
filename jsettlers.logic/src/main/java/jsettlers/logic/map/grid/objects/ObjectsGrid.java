@@ -23,6 +23,7 @@ import java.util.Set;
 import jsettlers.common.map.shapes.FreeMapArea;
 import jsettlers.common.map.shapes.HexGridArea;
 import jsettlers.common.mapobject.EMapObjectType;
+import jsettlers.common.mapobject.IMapObject;
 import jsettlers.common.movable.EDirection;
 import jsettlers.common.position.ShortPoint2D;
 import jsettlers.common.utils.coordinates.CoordinateStream;
@@ -104,6 +105,10 @@ public final class ObjectsGrid implements Serializable {
 
 	public final AbstractHexMapObject getObjectsAt(int x, int y) {
 		return objectsGrid[x + y * width];
+	}
+
+	public final IMapObject[] getObjectArray() {
+		return objectsGrid;
 	}
 
 	public final AbstractHexMapObject getMapObjectAt(int x, int y, EMapObjectType mapObjectType) {
@@ -194,9 +199,9 @@ public final class ObjectsGrid implements Serializable {
 	public void informObjectsAboutAttackable(ShortPoint2D position, IAttackable attackable, boolean informFullArea, boolean informAttackable) {
 		CoordinateStream area;
 		if (informFullArea) {
-			area = HexGridArea.stream(position.x, position.y, 1, Constants.TOWER_SEARCH_RADIUS);
+			area = HexGridArea.stream(position.x, position.y, 1, Constants.TOWER_ATTACKABLE_SEARCH_RADIUS);
 		} else {
-			area = HexGridArea.streamBorder(position.x, position.y, Constants.TOWER_SEARCH_RADIUS - 1);
+			area = HexGridArea.streamBorder(position.x, position.y, Constants.TOWER_ATTACKABLE_SEARCH_RADIUS - 1);
 		}
 
 		byte movableTeam = attackable.getPlayer().getTeamId();

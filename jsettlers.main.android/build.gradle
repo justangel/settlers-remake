@@ -46,6 +46,10 @@ android {
     packagingOptions {
         pickFirst '**'
     }
+
+    dataBinding {
+        enabled = true
+    }
 }
 
 dependencies {
@@ -56,6 +60,7 @@ dependencies {
     implementation project(':jsettlers.common')
     implementation project(':jsettlers.network')
 
+    implementation "android.arch.lifecycle:extensions:1.1.1"
     implementation 'com.android.support:appcompat-v7:' + rootProject.ext.androidSupportLibraryVersion
     implementation 'com.android.support:support-v4:' + rootProject.ext.androidSupportLibraryVersion
     implementation 'com.android.support:cardview-v7:' + rootProject.ext.androidSupportLibraryVersion
@@ -74,7 +79,7 @@ dependencies {
 
     // test dependencies
     androidTestImplementation project(':jsettlers.testutils')
-    androidTestImplementation 'com.android.support:support-annotations:27.1.0'
+    androidTestImplementation 'com.android.support:support-annotations:' + rootProject.ext.androidSupportLibraryVersion
     androidTestImplementation 'junit:junit:4.12'
     androidTestImplementation 'org.hamcrest:hamcrest-library:1.3'
     androidTestImplementation 'com.android.support.test:runner:1.0.1'

@@ -15,15 +15,11 @@
 
 package jsettlers.main.android;
 
-import static jsettlers.main.android.mainmenu.navigation.Actions.ACTION_PAUSE;
-import static jsettlers.main.android.mainmenu.navigation.Actions.ACTION_QUIT;
-import static jsettlers.main.android.mainmenu.navigation.Actions.ACTION_QUIT_CONFIRM;
-import static jsettlers.main.android.mainmenu.navigation.Actions.ACTION_SAVE;
-import static jsettlers.main.android.mainmenu.navigation.Actions.ACTION_UNPAUSE;
-
 import org.androidannotations.annotations.EApplication;
 
-import jsettlers.common.menu.IGameExitListener;
+import android.app.Application;
+import android.arch.lifecycle.Observer;
+
 import jsettlers.common.menu.IJoinPhaseMultiplayerGameConnector;
 import jsettlers.common.menu.IJoiningGame;
 import jsettlers.common.menu.IMapInterfaceConnector;
@@ -31,6 +27,7 @@ import jsettlers.common.menu.IMultiplayerConnector;
 import jsettlers.common.menu.IStartedGame;
 import jsettlers.common.menu.IStartingGame;
 import jsettlers.logic.constants.Constants;
+import jsettlers.logic.constants.MatchConstants;
 import jsettlers.logic.map.loading.list.MapList;
 import jsettlers.main.MultiplayerConnector;
 import jsettlers.main.android.core.AndroidPreferences;
@@ -39,16 +36,10 @@ import jsettlers.main.android.core.GameService_;
 import jsettlers.main.android.core.GameStarter;
 import jsettlers.main.android.core.controls.ControlsAdapter;
 import jsettlers.main.android.core.controls.GameMenu;
-
-import android.app.Application;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.support.v4.content.LocalBroadcastManager;
+import jsettlers.main.android.core.resources.scanner.AndroidResourcesLoader;
 
 @EApplication
-public class MainApplication extends Application implements GameStarter, GameManager, IGameExitListener {
+public class MainApplication extends Application implements GameStarter, GameManager {
 	static { // configure game to be better usable on Android
 		Constants.BUILDING_PLACEMENT_MAX_SEARCH_RADIUS = 10;
 	}
@@ -61,22 +52,11 @@ public class MainApplication extends Application implements GameStarter, GameMan
 
 	private ControlsAdapter controlsAdapter;
 
-	private LocalBroadcastManager localBroadcastManager;
-
 	@Override
 	public void onCreate() {
 		super.onCreate();
 		System.setProperty("org.xml.sax.driver", "org.xmlpull.v1.sax2.Driver");
-		localBroadcastManager = LocalBroadcastManager.getInstance(this);
-
-		// TODO register this only when a game starts
-		IntentFilter intentFilter = new IntentFilter();
-		intentFilter.addAction(ACTION_PAUSE);
-		intentFilter.addAction(ACTION_UNPAUSE);
-		intentFilter.addAction(ACTION_SAVE);
-		intentFilter.addAction(ACTION_QUIT);
-		intentFilter.addAction(ACTION_QUIT_CONFIRM);
-		registerReceiver(broadcastReceiver, intentFilter);
+		new AndroidResourcesLoader(this).setup();
 	}
 
 	/**
@@ -139,10 +119,11 @@ public class MainApplication extends Application implements GameStarter, GameMan
 
 	@Override
 	public IMapInterfaceConnector gameStarted(IStartedGame game) {
-		controlsAdapter = new ControlsAdapter(getApplicationContext(), game);
-		GameService_.intent(this).start();
+		controlsAdapter = new ControlsAdapter(getApplicationContext(), game, MatchConstants.clock());
+		game.setGameExitListener(controlsAdapter.getGameMenu());
+		controlsAdapter.getGameMenu().getGameState().observeForever(gameStateObserver);
 
-		game.setGameExitListener(this);
+		GameService_.intent(this).start();
 
 		return controlsAdapter.getMapContent().getInterfaceConnector();
 	}
@@ -157,6 +138,10 @@ public class MainApplication extends Application implements GameStarter, GameMan
 
 	@Override
 	public GameMenu getGameMenu() {
+		if (controlsAdapter == null) {
+			return null;
+		}
+
 		return controlsAdapter.getGameMenu();
 	}
 
@@ -165,43 +150,17 @@ public class MainApplication extends Application implements GameStarter, GameMan
 		return controlsAdapter != null;
 	}
 
-	/**
-	 * IGameExitedListener implementation
-	 */
-	@Override
-	public void gameExited(IStartedGame game) {
-		controlsAdapter = null;
-		startingGame = null;
-		joiningGame = null;
-		joinPhaseMultiplayerGameConnector = null;
-		mapList = null; // Nulling this means that any new saved games will be available next time mapList is set
+	private Observer<GameMenu.GameState> gameStateObserver = gameState -> {
+		if (gameState == GameMenu.GameState.QUITTED) {
+			controlsAdapter.getGameMenu().getGameState().removeObserver(this.gameStateObserver);
 
-		closeMultiPlayerConnector();
+			controlsAdapter = null;
+			startingGame = null;
+			joiningGame = null;
+			joinPhaseMultiplayerGameConnector = null;
+			mapList = null; // Nulling this means that any new saved games will be available next time mapList is set
 
-		// Send a local broadcast so that any UI can update if necessary and the service can stop itself
-		localBroadcastManager.sendBroadcast(new Intent(ACTION_QUIT_CONFIRM));
-	}
-
-	private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			switch (intent.getAction()) {
-			case ACTION_PAUSE:
-				controlsAdapter.getGameMenu().pause();
-				break;
-			case ACTION_UNPAUSE:
-				controlsAdapter.getGameMenu().unPause();
-				break;
-			case ACTION_SAVE:
-				controlsAdapter.getGameMenu().save();
-				break;
-			case ACTION_QUIT:
-				controlsAdapter.getGameMenu().quit();
-				break;
-			case ACTION_QUIT_CONFIRM:
-				controlsAdapter.getGameMenu().quitConfirm();
-				break;
-			}
+			closeMultiPlayerConnector();
 		}
 	};
 }

@@ -42,7 +42,7 @@ public class BuildingtestMap implements IGraphicsGrid {
 			}
 		}
 		PseudoTile middle = tiles[OFFSET][OFFSET];
-		IBuilding building = new PseudoBuilding(definition.getType(), middle.getPos());
+		IBuilding building = new PseudoBuilding(definition.getType(), middle.getPosition());
 		middle.setBuilding(building);
 	}
 
@@ -106,11 +106,6 @@ public class BuildingtestMap implements IGraphicsGrid {
 
 	@Override
 	public void setBackgroundListener(IGraphicsBackgroundListener backgroundListener) {
-	}
-
-	@Override
-	public int nextDrawableX(int x, int y, int maxX) {
-		return x + 1;
 	}
 
 	@Override

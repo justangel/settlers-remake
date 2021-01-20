@@ -71,4 +71,12 @@ public abstract class ImageLink implements Serializable {
 	 * @return The image index.
 	 */
 	public abstract int getImageIndex();
+
+	public abstract int getSequence();
+
+	public abstract EImageLinkType getType();
+
+    public abstract int getFile();
+
+    public abstract String getHumanName();
 }

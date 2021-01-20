@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 - 2017
+ * Copyright (c) 2015 - 2018
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -14,21 +14,22 @@
  *******************************************************************************/
 package jsettlers.graphics.map.controls.original.panel;
 
+import jsettlers.common.action.Action;
+import jsettlers.common.action.EActionType;
+import jsettlers.common.action.IAction;
+import jsettlers.common.action.PointAction;
+import jsettlers.common.action.SetDockAction;
+import jsettlers.common.action.SetTradingWaypointAction;
+import jsettlers.common.action.SetTradingWaypointAction.EWaypointType;
 import jsettlers.common.images.EImageLinkType;
 import jsettlers.common.images.OriginalImageLink;
 import jsettlers.common.map.IGraphicsGrid;
 import jsettlers.common.map.shapes.MapRectangle;
-import jsettlers.common.action.EActionType;
-import jsettlers.common.action.IAction;
 import jsettlers.common.player.IInGamePlayer;
 import jsettlers.common.position.ShortPoint2D;
-import jsettlers.common.action.Action;
 import jsettlers.graphics.action.ActionFireable;
 import jsettlers.graphics.action.AskSetTradingWaypointAction;
 import jsettlers.graphics.action.ExecutableAction;
-import jsettlers.common.action.PointAction;
-import jsettlers.common.action.SetTradingWaypointAction;
-import jsettlers.common.action.SetTradingWaypointAction.EWaypointType;
 import jsettlers.graphics.localization.Labels;
 import jsettlers.graphics.map.controls.original.ControlPanelLayoutProperties;
 import jsettlers.graphics.map.controls.original.panel.content.AbstractContentProvider;
@@ -36,6 +37,7 @@ import jsettlers.graphics.map.controls.original.panel.content.ContentType;
 import jsettlers.graphics.map.controls.original.panel.content.ESecondaryTabType;
 import jsettlers.graphics.map.controls.original.panel.content.MessageContent;
 import jsettlers.graphics.ui.Button;
+import jsettlers.graphics.ui.LabeledButton;
 import jsettlers.graphics.ui.UIPanel;
 
 /**
@@ -73,32 +75,30 @@ public class MainPanel extends UIPanel {
 			new TabButton(ContentType.PRODUCTION, BUTTONS_FILE, 243, 255, ""),
 	};
 
-	private final MessageContent quitPrompt = new MessageContent(
-			Labels.getString("game-quit"),
-			Labels.getString("game-quit-cancel"),
-			new ExecutableAction() {
-				@Override
-				public void execute() {
-					setContent(ContentType.BUILD_NORMAL);
-					btnSystem.setActive(false);
-				}
-			},
-			Labels.getString("game-quit-ok"),
-			new Action(EActionType.EXIT)) {
-		@Override
-		public void contentShowing(ActionFireable actionFireable) {
-			btnSystem.setActive(true);
-		}
+	private final UIPanel gamePanel = new UIPanel();
 
-		@Override
-		public void contentHiding(ActionFireable actionFireable, AbstractContentProvider nextContent) {
+	private final LabeledButton exitButton = new LabeledButton(Labels.getString("game-menu-quit"), new Action(EActionType.EXIT));
+	private final LabeledButton saveButton = new LabeledButton(Labels.getString("game-menu-save"), new Action(EActionType.SAVE));
+	private final LabeledButton cancelButton = new LabeledButton(Labels.getString("game-menu-cancel"), new ExecutableAction() {
+		public void execute() {
+			setContent(ContentType.BUILD_NORMAL);
 			btnSystem.setActive(false);
 		}
+	});
+
+	{
+		gamePanel.addChild(saveButton, .1f, .4f, .9f, .5f);
+		gamePanel.addChild(exitButton, .1f, .25f, .9f, .35f);
+		gamePanel.addChild(cancelButton, .1f, .1f, .9f, .2f);
+	}
+
+	private AbstractContentProvider gamePanelACP = new AbstractContentProvider() {
+		public UIPanel getPanel() { return gamePanel; }
 	};
 
-	private final Button btnSystem = new TabButton(quitPrompt,
+	private final Button btnSystem = new TabButton(gamePanelACP,
 			new OriginalImageLink(EImageLinkType.GUI, BUTTONS_FILE, 93, 0),
-			new OriginalImageLink(EImageLinkType.GUI, BUTTONS_FILE, 96, 0), Labels.getString("game-quit-description"));
+			new OriginalImageLink(EImageLinkType.GUI, BUTTONS_FILE, 96, 0), Labels.getString("game-menu-description"));
 
 	private final Button btnScroll = new TabButton(ContentType.EMPTY, BUTTONS_FILE, 111, 99, "");
 	private final Button btnSwords = new TabButton(ContentType.EMPTY, BUTTONS_FILE, 114, 102, "");
@@ -290,9 +290,9 @@ public class MainPanel extends UIPanel {
 		EActionType type = action.getActionType();
 		switch (type) {
 		case MOVE_TO:
-		case SET_DOCK:
 		case SET_TRADING_WAYPOINT:
 		case SET_WORK_AREA:
+        case SET_DOCK:
 			if (activeContent instanceof SelectPointMessage) {
 				goBack();
 			}
@@ -300,10 +300,10 @@ public class MainPanel extends UIPanel {
 		case ASK_SET_DOCK:
 			goBackContent = activeContent;
 			setContent(new SelectPointMessage(
-					Labels.getString("click_set_dock")) {
+					Labels.getString("action_ASK_SET_DOCK")) {
 				@Override
 				public PointAction getSelectAction(ShortPoint2D position) {
-					return new PointAction(EActionType.SET_DOCK, position);
+					return new SetDockAction(position);
 				}
 			});
 			return null;
@@ -332,8 +332,8 @@ public class MainPanel extends UIPanel {
 			goBackContent = activeContent;
 			setContent(new MessageContent(
 					Labels.getString("really_destroy_building"),
-					Labels.getName(EActionType.DESTROY), new Action(
-							EActionType.DESTROY),
+					Labels.getString("action_ASK_DESTROY"),
+					new Action(EActionType.DESTROY),
 					Labels.getString("abort"),
 					new Action(EActionType.ABORT)) {
 				@Override
@@ -364,9 +364,9 @@ public class MainPanel extends UIPanel {
 
 	public void setMapViewport(MapRectangle screenArea, IGraphicsGrid grid) {
 		this.grid = grid;
-		displayCenter = new ShortPoint2D(screenArea.getLineStartX(screenArea.getLines() / 2)
-				+ screenArea.getLineLength() / 2, screenArea
-				.getLineY(screenArea.getLines() / 2));
+		short x = (short) (screenArea.getMinX() + (screenArea.getWidth() / 2));
+		short y = (short) (screenArea.getMinY() + (screenArea.getHeight() / 2));
+		displayCenter = new ShortPoint2D(x, y);
 		sendMapPositionChange();
 	}
 

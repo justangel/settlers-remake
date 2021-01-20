@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015
+ * Copyright (c) 2015 - 2018
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -14,31 +14,54 @@
  *******************************************************************************/
 package jsettlers.main.swing.resources;
 
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 import jsettlers.common.resources.IResourceProvider;
 
 public class SwingResourceProvider implements IResourceProvider {
-	private final String resourcesDirectory;
+	private final File resourcesDirectory;
 
-	public SwingResourceProvider(File resourcesDirectory) {
-		this.resourcesDirectory = resourcesDirectory.getPath() + File.separator;
+	public SwingResourceProvider() {
+		this.resourcesDirectory = getAppHome();
+	}
+
+	private static File getAppHome() {
+		String os = System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH);
+
+		String settlersHomeDirectory;
+		if (os.startsWith("windows")) {
+			settlersHomeDirectory = System.getenv("APPDATA") + File.separator + ".jsettlers";
+		} else {
+			String home = System.getProperty("user.home");
+			settlersHomeDirectory = home + File.separator + ".jsettlers";
+		}
+
+		File dirFile = new File(settlersHomeDirectory);
+		dirFile.mkdirs();
+		return dirFile;
 	}
 
 	@Override
 	public InputStream getResourcesFileStream(String name) throws IOException {
-		File file = new File(resourcesDirectory + name);
-		return new FileInputStream(file);
+		File file = new File(resourcesDirectory, name);
+		if (file.exists()) {
+			return new FileInputStream(file);
+		} else {
+			return new ByteArrayInputStream(new byte[0]);
+		}
 	}
 
 	@Override
 	public OutputStream writeConfigurationFile(String name) throws IOException {
-		File file = new File(resourcesDirectory + name);
+		File file = new File(resourcesDirectory, name);
 		file.getParentFile().mkdirs();
 		return new FileOutputStream(file);
 	}
@@ -52,6 +75,6 @@ public class SwingResourceProvider implements IResourceProvider {
 
 	@Override
 	public File getResourcesDirectory() {
-		return new File(resourcesDirectory);
+		return resourcesDirectory;
 	}
 }

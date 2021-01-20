@@ -64,6 +64,7 @@ public class JSettlersFrame extends JFrame {
 
 	private Timer redrawTimer;
 	private boolean fullScreen = false;
+	private AreaContainer areaContainer;
 
 	JSettlersFrame() throws HeadlessException {
 		setTitle("JSettlers - Version: " + CommitInfo.COMMIT_HASH_SHORT);
@@ -71,7 +72,7 @@ public class JSettlersFrame extends JFrame {
 		SettingsManager settingsManager = SettingsManager.getInstance();
 
 		UiPlayer uiPlayer = settingsManager.getPlayer();
-		multiPlayerConnector = new MultiplayerConnector(settingsManager.get(SettingsManager.SETTING_SERVER), uiPlayer.getId(), uiPlayer.getName());
+		multiPlayerConnector = new MultiplayerConnector(settingsManager.getServer(), uiPlayer.getId(), uiPlayer.getName());
 		mainPanel = new MainMenuPanel(this, multiPlayerConnector);
 
 		showMainMenu();
@@ -123,6 +124,11 @@ public class JSettlersFrame extends JFrame {
 	}
 
 	public void showMainMenu() {
+		if(areaContainer != null) {
+			areaContainer.disposeAll();
+			areaContainer = null;
+		}
+
 		abortRedrawTimerIfPresent();
 		setNewContentPane(mainPanel);
 	}
@@ -152,7 +158,7 @@ public class JSettlersFrame extends JFrame {
 		Region region = new Region(500, 500);
 		region.setContent(content);
 		Area area = new Area();
-		area.add(region);
+		area.set(region);
 
 		redrawTimer = new Timer("opengl-redraw");
 		redrawTimer.schedule(new TimerTask() {
@@ -160,10 +166,10 @@ public class JSettlersFrame extends JFrame {
 			public void run() {
 				region.requestRedraw();
 			}
-		}, 100, 25);
+		}, 100, 1000/SettingsManager.getInstance().getFpsLimit());
 
 		SwingUtilities.invokeLater(() -> {
-			setContentPane(new AreaContainer(area));
+			setContentPane(areaContainer = new AreaContainer(area, SettingsManager.getInstance().getBackend(), SettingsManager.getInstance().isGraphicsDebug()));
 			revalidate();
 			repaint();
 		});
@@ -189,7 +195,7 @@ public class JSettlersFrame extends JFrame {
 	}
 
 	public IMapInterfaceConnector showStartedGame(IStartedGame startedGame) {
-		MapContent content = new MapContent(startedGame, soundPlayer, ETextDrawPosition.TOP_RIGHT);
+		MapContent content = new MapContent(startedGame, soundPlayer, SettingsManager.getInstance().getFpsLimit(), ETextDrawPosition.TOP_RIGHT);
 		SwingUtilities.invokeLater(() -> setContent(content));
 		startedGame.setGameExitListener(exitGame -> SwingUtilities.invokeLater(this::showMainMenu));
 		return content.getInterfaceConnector();

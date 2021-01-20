@@ -26,7 +26,7 @@ import jsettlers.common.map.shapes.MapRectangle;
 import jsettlers.common.position.ShortPoint2D;
 import jsettlers.common.utils.FileUtils;
 import jsettlers.graphics.map.MapDrawContext;
-import jsettlers.graphics.reader.bytereader.ByteReader;
+import jsettlers.graphics.image.reader.bytereader.ByteReader;
 
 /*
  * This class manages reading and playing of the sound file.
@@ -44,7 +44,7 @@ import jsettlers.graphics.reader.bytereader.ByteReader;
  * 13: fire
  * 14: dying pig <br>
  * 15/16/17: fisherman
- * 20: shipyard
+ * 20: dockyard
  * 21: healer
  * 24: geologist
  * 25: bowman
@@ -250,8 +250,8 @@ public class SoundManager {
 			if (alternatives != null && alternatives.length > 0) {
 				int rand = random.nextInt(alternatives.length);
 
-				int maxA = area.getLineLength(); // get screen area
-				int maxB = area.getLines();
+				int maxA = area.getWidth(); // get screen area
+				int maxB = area.getHeight();
 				int b = y - area.getMinY();
 				int a = x - area.getLineStartX(b);
 				float leftVolume, rightVolume;

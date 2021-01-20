@@ -38,6 +38,7 @@ import jsettlers.graphics.map.controls.original.panel.content.ContentType;
 import jsettlers.graphics.map.controls.original.panel.content.MessageContent;
 import jsettlers.graphics.map.controls.original.panel.selection.BearerSelectionContent;
 import jsettlers.graphics.map.controls.original.panel.selection.BuildingSelectionContent;
+import jsettlers.graphics.map.controls.original.panel.selection.ShipSelectionContent;
 import jsettlers.graphics.map.controls.original.panel.selection.SoilderSelectionContent;
 import jsettlers.graphics.map.controls.original.panel.selection.SpecialistSelectionContent;
 import jsettlers.graphics.map.minimap.Minimap;
@@ -159,10 +160,7 @@ public class OriginalControls implements IControls {
 	@Override
 	public void drawAt(GLDrawContext gl) {
 		if (minimap != null) {
-			gl.glPushMatrix();
-			gl.glTranslatef(getMinimapLeft(), getMinimapBottom(), 0);
-			minimap.draw(gl);
-			gl.glPopMatrix();
+			minimap.draw(gl, getMinimapLeft(), getMinimapBottom());
 		}
 		uiBase.drawAt(gl); // Frame decoration should be drawn after and over the edges of the minimap.
 	}
@@ -384,7 +382,9 @@ public class OriginalControls implements IControls {
 			case SPECIALISTS:
 				mainPanel.setContent(new SpecialistSelectionContent(selection));
 				break;
-
+			case SHIPS:
+				mainPanel.setContent(new ShipSelectionContent(selection));
+				break;
 			case BUILDING:
 				mainPanel.setContent(new BuildingSelectionContent(selection));
 				break;

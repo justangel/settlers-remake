@@ -85,6 +85,11 @@ public final class FogOfWar implements Serializable {
 		}
 	}
 
+	public byte[][] getVisibleStatusArray() {
+		if(enabled) return sight;
+		return null;
+	}
+
 	private boolean isPlayerOK(IPlayerable playerable) {
 		return (MatchConstants.ENABLE_ALL_PLAYER_FOG_OF_WAR || (playerable.getPlayer().getTeamId() == team));
 	}
@@ -159,7 +164,7 @@ public final class FogOfWar implements Serializable {
 				if (isPlayerOK(curr)) {
 					short distance = curr.getViewDistance();
 					if (distance > 0) {
-						ShortPoint2D pos = curr.getPos();
+						ShortPoint2D pos = curr.getPosition();
 						if (pos != null)
 							drawer.drawCircleToBuffer(pos.x, pos.y, distance);
 					}

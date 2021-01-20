@@ -18,6 +18,8 @@ import java.util.Locale;
 
 /**
  * This is a virtual link to a image in a settler image file.
+ * <p>
+ * Files indexes are always the ones of the gold editon of settlers 3. Internal translating allows to migtrate between gold and demo.
  * 
  * @author Michael Zangl
  * @see EImageLinkType
@@ -30,6 +32,7 @@ public final class OriginalImageLink extends ImageLink {
 	private final int sequence;
 	private final int image;
 	private final int length;
+	private final String humanName;
 
 	/**
 	 * Creates a new image link description.
@@ -45,12 +48,17 @@ public final class OriginalImageLink extends ImageLink {
 	 * @param length
 	 *            The number contained in the sequence that is linked,
 	 */
-	public OriginalImageLink(EImageLinkType type, int file, int sequence, int image, int length) {
+	public OriginalImageLink(EImageLinkType type, int file, int sequence, int image, int length, String name) {
 		this.type = type;
 		this.file = file;
 		this.sequence = sequence;
 		this.image = image;
 		this.length = length;
+		this.humanName = name;
+	}
+
+	public OriginalImageLink(EImageLinkType type, int file, int sequence, int image, int length) {
+		this(type, file, sequence, image, length, null);
 	}
 
 	/**
@@ -143,5 +151,13 @@ public final class OriginalImageLink extends ImageLink {
 	@Override
 	public int getImageIndex() {
 		return image;
+	}
+
+	public EImageLinkType type() {
+		return type;
+	}
+
+	public String getHumanName() {
+		return humanName;
 	}
 }

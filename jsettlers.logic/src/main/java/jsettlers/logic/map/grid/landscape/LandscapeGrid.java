@@ -39,6 +39,8 @@ import jsettlers.logic.map.grid.flags.IProtectedProvider.IProtectedChangedListen
 public final class LandscapeGrid implements Serializable, IWalkableGround, IFlattenedResettable, IDebugColorSetable, IProtectedChangedListener, IBlockingProvider {
 	private static final long serialVersionUID = -751261669662036483L;
 
+	public static final short SEA_BLOCKED_PARTITION = 0;
+
 	/**
 	 * This class is used as null object to get rid of a lot of null checks
 	 *
@@ -48,8 +50,7 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 		private static final long serialVersionUID = -332117701485179252L;
 
 		@Override
-		public final void backgroundChangedAt(int x, int y) {
-		}
+		public void backgroundShapeChangedAt(int x, int y) {}
 	}
 
 	private final byte[] heightGrid;
@@ -65,7 +66,7 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 	private final IProtectedProvider protectedProvider;
 	private final FlattenedResetter flattenedResetter;
 
-	public transient int[] debugColors;
+	private transient int[] debugColors;
 	private transient IGraphicsBackgroundListener backgroundListener;
 
 	public LandscapeGrid(short width, short height, IProtectedProvider protectedProvider) {
@@ -95,7 +96,7 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 		initDebugColors();
 	}
 
-	private final void initDebugColors() {
+	private void initDebugColors() {
 		if (MatchConstants.ENABLE_DEBUG_COLORS) {
 			this.debugColors = new int[width * height];
 		} else {
@@ -111,7 +112,7 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 		return ELandscapeType.VALUES[landscapeGrid[x + y * width]];
 	}
 
-	public boolean isLandscapeOf(int x, int y, ELandscapeType... landscapeTypes) {
+	private boolean isLandscapeOf(int x, int y, ELandscapeType... landscapeTypes) {
 		ELandscapeType landscapeType = getLandscapeTypeAt(x, y);
 		for (ELandscapeType curr : landscapeTypes) {
 			if (landscapeType == curr) {
@@ -122,11 +123,9 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 	}
 
 	public boolean isHexAreaOfType(int x, int y, int minRadius, int maxRadius, ELandscapeType... landscapeTypes) {
-		boolean isOfType = HexGridArea
-				.stream(x, y, minRadius, maxRadius)
+		return HexGridArea.stream(x, y, minRadius, maxRadius)
 				.filter((currX, currY) -> !isLandscapeOf(currX, currY, landscapeTypes))
 				.isEmpty();
-		return isOfType;
 	}
 
 	@Override
@@ -158,12 +157,12 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 		}
 
 		this.landscapeGrid[x + y * width] = landscapeType.ordinal;
-		backgroundListener.backgroundChangedAt(x, y);
+		backgroundListener.backgroundShapeChangedAt(x, y);
 	}
 
 	public final void setHeightAt(short x, short y, byte height) {
 		this.heightGrid[x + y * width] = height;
-		backgroundListener.backgroundChangedAt(x, y);
+		backgroundListener.backgroundShapeChangedAt(x, y);
 	}
 
 	public void flattenAndChangeHeightTowards(int x, int y, byte targetHeight) {
@@ -173,7 +172,7 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 		this.landscapeGrid[index] = ELandscapeType.FLATTENED.ordinal;
 		this.temporaryFlatened[index] = Byte.MAX_VALUE; // cancel the flattening
 
-		backgroundListener.backgroundChangedAt(x, y);
+		backgroundListener.backgroundShapeChangedAt(x, y);
 	}
 
 	public final void setBackgroundListener(IGraphicsBackgroundListener backgroundListener) {
@@ -193,7 +192,9 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 	 * gets the resource amount at the given position
 	 *
 	 * @param x
+	 * 		x coordinate
 	 * @param y
+	 * 		y coordinate
 	 * @return The amount of resources, where 0 is no resources and @link Byte.MAX_VALUE means full resources.
 	 */
 	public final byte getResourceAmountAt(int x, int y) {
@@ -240,7 +241,9 @@ public final class LandscapeGrid implements Serializable, IWalkableGround, IFlat
 	 * Sets the landscape to flattened after a settler walked on it.
 	 *
 	 * @param x
+	 * 		x coordinate
 	 * @param y
+	 * 		y coordinate
 	 */
 	private void flatten(int x, int y) {
 		if (isHexAreaOfType(x, y, 0, 1, ELandscapeType.GRASS, ELandscapeType.FLATTENED)) {

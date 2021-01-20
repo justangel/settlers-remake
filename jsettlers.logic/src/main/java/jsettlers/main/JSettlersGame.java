@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015, 2016
+ * Copyright (c) 2015 - 2018
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -23,8 +23,8 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Locale;
 
-import java8.util.Optional;
 import jsettlers.ai.highlevel.AiExecutor;
 import jsettlers.common.CommonConstants;
 import jsettlers.common.map.IGraphicsGrid;
@@ -42,6 +42,7 @@ import jsettlers.input.GuiInterface;
 import jsettlers.input.IGameStoppable;
 import jsettlers.input.PlayerState;
 import jsettlers.logic.buildings.Building;
+import jsettlers.logic.buildings.trading.HarborBuilding;
 import jsettlers.logic.buildings.trading.MarketBuilding;
 import jsettlers.logic.constants.MatchConstants;
 import jsettlers.logic.map.grid.MainGrid;
@@ -64,6 +65,7 @@ import jsettlers.network.client.interfaces.INetworkConnector;
  * @author Andreas Eberle
  */
 public class JSettlersGame {
+	private static final SimpleDateFormat LOG_DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US);
 	private final Object stopMutex = new Object();
 
 	private final IGameCreator mapCreator;
@@ -94,7 +96,7 @@ public class JSettlersGame {
 				+ Arrays.toString(playerSettings) + " multiplayer: " + multiplayer + " mapCreator: " + mapCreator);
 
 		if (mapCreator == null) {
-			throw new NullPointerException("mapCreator");
+			throw new IllegalArgumentException("No mapCreator provided (mapCreator==null).");
 		}
 
 		this.mapCreator = mapCreator;
@@ -148,20 +150,6 @@ public class JSettlersGame {
 		}
 	}
 
-	public static JSettlersGame loadFromReplayFileAllAi(ReplayUtils.IReplayStreamProvider loadableReplayFile, INetworkConnector networkConnector, ReplayStartInformation replayStartInformation)
-			throws MapLoadException {
-		try {
-			DataInputStream replayFileInputStream = new DataInputStream(loadableReplayFile.openStream());
-			replayStartInformation.deserialize(replayFileInputStream);
-
-			MapLoader mapCreator = loadableReplayFile.getMap(replayStartInformation);
-			return new JSettlersGame(mapCreator, replayStartInformation.getRandomSeed(), networkConnector, (byte) replayStartInformation.getPlayerId(), replayStartInformation.getPlayerSettings(),
-					true, false, null);
-		} catch (IOException e) {
-			throw new MapLoadException("Could not deserialize " + loadableReplayFile, e);
-		}
-	}
-
 	/**
 	 * Starts the game in a new thread. Returns immediately.
 	 *
@@ -209,6 +197,7 @@ public class JSettlersGame {
 		private IGameExitListener exitListener;
 		private boolean gameRunning;
 		private AiExecutor aiExecutor;
+		private WinLoseTracker winLoseTracker;
 
 		@Override
 		public void run() {
@@ -261,6 +250,9 @@ public class JSettlersGame {
 
 				aiExecutor = new AiExecutor(playerSettings, mainGrid, networkConnector.getTaskScheduler());
 				networkConnector.getGameClock().schedule(aiExecutor, (short) 10000);
+
+				winLoseTracker = new WinLoseTracker(mainGrid, playerId);
+				networkConnector.getGameClock().schedule(winLoseTracker, (short) 5000);
 
 				MatchConstants.clock().startExecution(); // WARNING: GAME CLOCK IS STARTED!
 				// NO CONFIGURATION AFTER THIS POINT! =================================
@@ -382,6 +374,11 @@ public class JSettlersGame {
 		}
 
 		@Override
+		public boolean isMultiplayerGame() {
+			return multiplayer;
+		}
+
+		@Override
 		public void stopGame() {
 			stop();
 		}
@@ -424,7 +421,7 @@ public class JSettlersGame {
 	}
 
 	private static DateFormat getLogDateFormatter() {
-		return new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+		return LOG_DATE_FORMATTER;
 	}
 
 	public static void clearState() {
@@ -432,6 +429,7 @@ public class JSettlersGame {
 		Movable.resetState();
 		Building.clearState();
 		MarketBuilding.clearState();
+		HarborBuilding.clearState();
 		MatchConstants.clearState();
 	}
 }

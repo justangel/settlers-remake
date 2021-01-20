@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 - 2017
+ * Copyright (c) 2015 - 2019
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -14,19 +14,6 @@
  *******************************************************************************/
 package jsettlers.ai.highlevel;
 
-import static java8.util.stream.StreamSupport.stream;
-import static jsettlers.common.buildings.EBuildingType.BIG_TOWER;
-import static jsettlers.common.buildings.EBuildingType.CASTLE;
-import static jsettlers.common.buildings.EBuildingType.LUMBERJACK;
-import static jsettlers.common.buildings.EBuildingType.TOWER;
-import static jsettlers.common.mapobject.EMapObjectType.STONE;
-import static jsettlers.common.mapobject.EMapObjectType.TREE_ADULT;
-import static jsettlers.common.mapobject.EMapObjectType.TREE_GROWING;
-import static jsettlers.common.movable.EMovableType.BEARER;
-import static jsettlers.common.movable.EMovableType.SWORDSMAN_L1;
-import static jsettlers.common.movable.EMovableType.SWORDSMAN_L2;
-import static jsettlers.common.movable.EMovableType.SWORDSMAN_L3;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,6 +25,11 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.Vector;
 
+import java8.util.Comparators;
+import java8.util.J8Arrays;
+import java8.util.Maps;
+import java8.util.Objects;
+import java8.util.stream.Collectors;
 import jsettlers.ai.highlevel.AiPositions.AiPositionFilter;
 import jsettlers.algorithms.construction.AbstractConstructionMarkableMap;
 import jsettlers.common.CommonConstants;
@@ -53,6 +45,7 @@ import jsettlers.common.movable.EDirection;
 import jsettlers.common.movable.EMovableAction;
 import jsettlers.common.movable.EMovableType;
 import jsettlers.common.movable.IMovable;
+import jsettlers.common.player.EWinState;
 import jsettlers.common.player.IPlayer;
 import jsettlers.common.position.RelativePoint;
 import jsettlers.common.position.ShortPoint2D;
@@ -68,11 +61,18 @@ import jsettlers.logic.map.grid.partition.PartitionsGrid;
 import jsettlers.logic.movable.interfaces.ILogicMovable;
 import jsettlers.logic.player.Player;
 
-import java8.util.Comparators;
-import java8.util.J8Arrays;
-import java8.util.Maps;
-import java8.util.Objects;
-import java8.util.stream.Collectors;
+import static java8.util.stream.StreamSupport.stream;
+import static jsettlers.common.buildings.EBuildingType.BIG_TOWER;
+import static jsettlers.common.buildings.EBuildingType.CASTLE;
+import static jsettlers.common.buildings.EBuildingType.LUMBERJACK;
+import static jsettlers.common.buildings.EBuildingType.TOWER;
+import static jsettlers.common.mapobject.EMapObjectType.STONE;
+import static jsettlers.common.mapobject.EMapObjectType.TREE_ADULT;
+import static jsettlers.common.mapobject.EMapObjectType.TREE_GROWING;
+import static jsettlers.common.movable.EMovableType.BEARER;
+import static jsettlers.common.movable.EMovableType.SWORDSMAN_L1;
+import static jsettlers.common.movable.EMovableType.SWORDSMAN_L2;
+import static jsettlers.common.movable.EMovableType.SWORDSMAN_L3;
 
 /**
  * This class calculates statistics based on the grids which are used by highlevel and lowlevel KI. The statistics are calculated once and read multiple times within one AiExecutor step triggerd by
@@ -83,7 +83,8 @@ import java8.util.stream.Collectors;
 public class AiStatistics {
 
 	private static final EBuildingType[] REFERENCE_POINT_FINDER_BUILDING_ORDER = { LUMBERJACK, TOWER, BIG_TOWER, CASTLE };
-	public static final int NEAR_STONE_DISTANCE = 5;
+
+	private static final int NEAR_STONE_DISTANCE = 5;
 
 	private final MainGrid mainGrid;
 	private final Queue<Building> buildings;
@@ -161,7 +162,7 @@ public class AiStatistics {
 		if (!playerStatistic.buildingPositions.containsKey(type)) {
 			playerStatistic.buildingPositions.put(type, new ArrayList<>());
 		}
-		playerStatistic.buildingPositions.get(type).add(building.getPos());
+		playerStatistic.buildingPositions.get(type).add(building.getPosition());
 
 		if (type == EBuildingType.WINEGROWER) {
 			playerStatistic.wineGrowerWorkAreas.add(((WorkAreaBuilding) building).getWorkAreaCenter());
@@ -185,9 +186,7 @@ public class AiStatistics {
 				playerStatistic.numberOfNotOccupiedMilitaryBuildings++;
 			}
 		} else if (building.getBuildingType().isMilitaryBuilding()) {
-			if (building.isOccupied()) {
-				playerStatistic.isAlive = true;
-			} else {
+			if (!building.isOccupied()) {
 				playerStatistic.numberOfNotOccupiedMilitaryBuildings++;
 			}
 		}
@@ -256,7 +255,7 @@ public class AiStatistics {
 						playerStatistics[movablePlayerId].joblessBearerPositions.add(movable.getPosition());
 					}
 					if (player != null && player.playerId != movablePlayerId && movableType.isSoldier() && getEnemiesOf(player).contains(movablePlayer)) {
-						playerStatistics[player.playerId].enemyTroopsInTown.addNoCollission(movable.getPos().x, movable.getPos().y);
+						playerStatistics[player.playerId].enemyTroopsInTown.addNoCollission(movable.getPosition().x, movable.getPosition().y);
 					}
 				}
 				if (player == null) {
@@ -653,12 +652,13 @@ public class AiStatistics {
 		return playerStatistics[playerId].otherPartitionBorder;
 	}
 
-	private boolean isAlive(IPlayer player) {
-		return isAlive(player.getPlayerId());
+	public boolean isAlive(IPlayer player) {
+		return player.getWinState() != EWinState.LOST;
 	}
 
 	public boolean isAlive(byte playerId) {
-		return playerStatistics[playerId].isAlive;
+		IPlayer player = partitionsGrid.getPlayer(playerId);
+		return isAlive(player);
 	}
 
 	public AiMapInformation getAiMapInformation() {
@@ -702,7 +702,6 @@ public class AiStatistics {
 
 	private static class PlayerStatistic {
 		ShortPoint2D referencePosition;
-		boolean isAlive;
 		final int[] totalBuildingsNumbers = new int[EBuildingType.NUMBER_OF_BUILDINGS];
 		final int[] buildingsNumbers = new int[EBuildingType.NUMBER_OF_BUILDINGS];
 		final Map<EBuildingType, List<ShortPoint2D>> buildingPositions = new HashMap<>();
@@ -734,7 +733,6 @@ public class AiStatistics {
 		}
 
 		public void clearAll() {
-			isAlive = false;
 			materials = null;
 			buildingPositions.clear();
 			enemyTroopsInTown.clear();

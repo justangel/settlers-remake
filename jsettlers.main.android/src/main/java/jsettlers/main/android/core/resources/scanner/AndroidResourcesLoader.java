@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017
+ * Copyright (c) 2017 - 2018
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
@@ -19,22 +19,26 @@ import java.io.File;
 
 import org.androidannotations.annotations.EBean;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Environment;
+import android.preference.PreferenceManager;
+
+import io.reactivex.Completable;
 import jsettlers.common.resources.ResourceManager;
 import jsettlers.common.resources.SettlersFolderChecker;
 import jsettlers.common.resources.SettlersFolderChecker.SettlersFolderInfo;
+import jsettlers.graphics.image.reader.DatFileUtils;
 import jsettlers.graphics.map.draw.ImageProvider;
 import jsettlers.graphics.sound.SoundManager;
 import jsettlers.logic.map.loading.list.MapList;
 import jsettlers.main.android.core.resources.AndroidMapListFactory;
 import jsettlers.main.android.core.resources.AndroidResourceProvider;
 
-import android.content.Context;
-import android.os.Environment;
-import android.preference.PreferenceManager;
-
 @EBean
 public class AndroidResourcesLoader {
 	private static final String ORIGINAL_SETTLERS_FILES_PATH_SETTING_KEY = "external-files-path";
+	private static final String ORIGINAL_SETTLERS_FILES_VERSION_ID = "external-files-version-id";
 
 	private final Context context;
 
@@ -46,19 +50,38 @@ public class AndroidResourcesLoader {
 		File storage = Environment.getExternalStorageDirectory();
 		File outputDirectory = context.getExternalFilesDir(null); // <- output dir, always writable
 
-		String originalSettlersFolder = PreferenceManager.getDefaultSharedPreferences(context).getString(ORIGINAL_SETTLERS_FILES_PATH_SETTING_KEY, storage + "/JSettlers");
+		SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+		String originalSettlersFolder = preferences.getString(ORIGINAL_SETTLERS_FILES_PATH_SETTING_KEY, storage + "/JSettlers");
 
 		SettlersFolderInfo settlersFolders = SettlersFolderChecker.checkSettlersFolder(originalSettlersFolder);
 		if (!settlersFolders.isValidSettlersFolder()) {
 			return false;
 		}
 
-		ImageProvider.setLookupPath(settlersFolders.gfxFolder);
+		String settlersVersionId = preferences.getString(ORIGINAL_SETTLERS_FILES_VERSION_ID, null);
+		if (settlersVersionId == null) {
+			settlersVersionId = DatFileUtils.generateOriginalVersionId(settlersFolders.gfxFolder);
+			preferences.edit().putString(ORIGINAL_SETTLERS_FILES_VERSION_ID, settlersVersionId).apply();
+		}
+
+		ImageProvider.setLookupPath(settlersFolders.gfxFolder, settlersVersionId);
 		SoundManager.setLookupPath(settlersFolders.sndFolder);
 
 		MapList.setDefaultListFactory(new AndroidMapListFactory(context.getAssets(), outputDirectory));
 		ResourceManager.setProvider(new AndroidResourceProvider(context, outputDirectory));
 		return true;
+	}
+
+	public Completable setupSingle() {
+		return Completable.create(emitter -> {
+			boolean success = setup();
+
+			if (success) {
+				emitter.onComplete();
+			} else {
+				emitter.onError(new Exception("Not a valid settlers folder"));
+			}
+		});
 	}
 
 	public void setResourcesDirectory(String path) {
